@@ -23,7 +23,14 @@ const authenticateUsuario = async (req, res) => {
 // Crear un usuario
 const createUsuario = async (req, res) => {
   const { Nombre, Apellido, Correo, Contrasena } = req.body;
-  const ImagenPerfil = req.file ? req.file.path : null; // Ruta de la imagen subida
+
+  console.log('Archivo recibido:', req.file); // Depuración
+
+  const ImagenPerfil = req.file ? `uploads/${req.file.filename}` : null;
+
+  if (!ImagenPerfil) {
+    return res.status(400).send('No se recibió el archivo ImagenPerfil');
+  }
 
   try {
     const pool = await poolPromise;
@@ -33,8 +40,51 @@ const createUsuario = async (req, res) => {
       .input('Correo', sql.NVarChar, Correo)
       .input('Contrasena', sql.NVarChar, Contrasena)
       .input('ImagenPerfil', sql.NVarChar, ImagenPerfil)
-      .query('INSERT INTO Usuarios (Nombre, Apellido, Correo, Contrasena, ImagenPerfil) VALUES (@Nombre, @Apellido, @Correo, @Contrasena, @ImagenPerfil)');
+      .query(`
+        INSERT INTO Usuarios 
+        (Nombre, Apellido, Correo, Contrasena, ImagenPerfil) 
+        VALUES (@Nombre, @Apellido, @Correo, @Contrasena, @ImagenPerfil)
+      `);
+
     res.status(201).send('Usuario creado exitosamente');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error al crear el usuario');
+  }
+};
+
+// Actualizar un usuario
+const updateUsuario = async (req, res) => {
+  const { id } = req.params;
+  const { Nombre, Apellido, Correo, Contrasena } = req.body;
+
+  // Guarda solo la ruta relativa del archivo
+  const ImagenPerfil = req.file ? `uploads/${req.file.filename}` : null;
+
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request()
+      .input('Id', sql.Int, id)
+      .input('Nombre', sql.NVarChar, Nombre)
+      .input('Apellido', sql.NVarChar, Apellido)
+      .input('Correo', sql.NVarChar, Correo)
+      .input('Contrasena', sql.NVarChar, Contrasena)
+      .input('ImagenPerfil', sql.NVarChar, ImagenPerfil)
+      .query(`
+        UPDATE Usuarios
+        SET
+          Nombre = @Nombre,
+          Apellido = @Apellido,
+          Correo = @Correo,
+          Contrasena = @Contrasena,
+          ImagenPerfil = ISNULL(@ImagenPerfil, ImagenPerfil)
+        WHERE Id = @Id
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).send('Usuario no encontrado');
+    }
+    res.send('Usuario actualizado exitosamente');
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -68,40 +118,6 @@ const getUsuarioById = async (req, res) => {
   }
 };
 
-// Actualizar un usuario
-const updateUsuario = async (req, res) => {
-  const { id } = req.params;
-  const { Nombre, Apellido, Correo, Contrasena } = req.body;
-  const ImagenPerfil = req.file ? req.file.path : null; // Ruta de la imagen subida
-
-  try {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .input('Id', sql.Int, id)
-      .input('Nombre', sql.NVarChar, Nombre)
-      .input('Apellido', sql.NVarChar, Apellido)
-      .input('Correo', sql.NVarChar, Correo)
-      .input('Contrasena', sql.NVarChar, Contrasena)
-      .input('ImagenPerfil', sql.NVarChar, ImagenPerfil)
-      .query(`
-        UPDATE Usuarios
-        SET
-          Nombre = @Nombre,
-          Apellido = @Apellido,
-          Correo = @Correo,
-          Contrasena = @Contrasena,
-          ImagenPerfil = ISNULL(@ImagenPerfil, ImagenPerfil)
-        WHERE Id = @Id
-      `);
-
-    if (result.rowsAffected[0] === 0) {
-      return res.status(404).send('Usuario no encontrado');
-    }
-    res.send('Usuario actualizado exitosamente');
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-};
 
 // Eliminar un usuario
 const deleteUsuario = async (req, res) => {
